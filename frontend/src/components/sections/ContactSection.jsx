@@ -2,6 +2,30 @@ import { useState } from 'react'
 import useScrollReveal from '../../hooks/useScrollReveal'
 
 const FORMSPREE_ENDPOINT = import.meta.env.VITE_FORMSPREE_ENDPOINT
+const DEBUG_TAG = '[ContactForm]'
+
+// In a production build (the deployed Vercel site), submit through our own
+// /api/contact serverless function instead of hitting Formspree directly.
+// That function logs the request and Formspree's response server-side, so
+// they show up in `vercel logs` / the Functions tab — not just the visitor's
+// browser console. `vite dev` doesn't run Vercel functions, so dev keeps
+// posting straight to Formspree with the client-side logging below.
+const USE_SERVER_PROXY = import.meta.env.PROD
+
+// Runs once per page load, in both `vite dev` and the deployed Vercel build —
+// open DevTools > Console on either to see it. Catches the classic "forgot to
+// set the env var on Vercel" case, which otherwise fails silently.
+if (!USE_SERVER_PROXY && !FORMSPREE_ENDPOINT) {
+  console.error(
+    `${DEBUG_TAG} VITE_FORMSPREE_ENDPOINT is not set — submissions will fail. ` +
+    `Set it in frontend/.env (dev).`,
+    { mode: import.meta.env.MODE }
+  )
+} else if (USE_SERVER_PROXY) {
+  console.log(`${DEBUG_TAG} Submitting via /api/contact (server-side logs in Vercel).`, { mode: import.meta.env.MODE })
+} else {
+  console.log(`${DEBUG_TAG} Formspree endpoint configured:`, FORMSPREE_ENDPOINT, { mode: import.meta.env.MODE })
+}
 
 export default function ContactSection() {
   const [form, setForm] = useState({ name: '', email: '', message: '' })
@@ -16,16 +40,46 @@ export default function ContactSection() {
     e.preventDefault()
     setError('')
     setLoading(true)
+
+    if (!USE_SERVER_PROXY && !FORMSPREE_ENDPOINT) {
+      console.error(`${DEBUG_TAG} Aborting submit — no endpoint configured.`)
+      setError('Contact form is misconfigured — please email me directly at devanr2911@gmail.com')
+      setLoading(false)
+      return
+    }
+
+    console.log(`${DEBUG_TAG} Submitting…`, { name: form.name, email: form.email, messageLength: form.message.length })
+
     try {
-      const res = await fetch(FORMSPREE_ENDPOINT, {
-        method: 'POST',
-        headers: { Accept: 'application/json' },
-        body: new FormData(e.target),
-      })
-      if (!res.ok) throw new Error('Request failed')
+      const res = USE_SERVER_PROXY
+        ? await fetch('/api/contact', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+            body: JSON.stringify({ name: form.name, email: form.email, message: form.message }),
+          })
+        : await fetch(FORMSPREE_ENDPOINT, {
+            method: 'POST',
+            headers: { Accept: 'application/json' },
+            body: new FormData(e.target),
+          })
+      const body = await res.json().catch(() => null)
+      console.log(`${DEBUG_TAG} Response`, { status: res.status, ok: res.ok, body })
+
+      if (!res.ok) throw new Error(body?.errors?.map((er) => er.message).join(', ') || 'Request failed')
+
+      // A 200/ok here only means Formspree accepted the submission — it does
+      // NOT guarantee an email lands in the inbox. Formspree's spam filter
+      // (Formshield) can silently route accepted submissions to the form's
+      // Spam tab instead of sending a notification. Check
+      // https://formspree.io/forms/<id>/submissions if messages "go missing".
+      // In production, also check the Vercel deployment's Functions logs for
+      // the [api/contact] entries logged server-side.
+      console.log(`${DEBUG_TAG} Accepted. If no email arrives, check the Spam tab in the Formspree dashboard${USE_SERVER_PROXY ? ' and the Vercel Functions logs' : ''}.`)
+
       setSent(true)
       setForm({ name: '', email: '', message: '' })
-    } catch {
+    } catch (err) {
+      console.error(`${DEBUG_TAG} Submit failed`, err)
       setError("Something went wrong — please email me directly at devanr2911@gmail.com")
     } finally {
       setLoading(false)

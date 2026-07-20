@@ -9,9 +9,13 @@ async function fillForm(user) {
   await user.type(screen.getByLabelText(/message/i), 'Hello there')
 }
 
+function mockResponse(ok, body = { ok }) {
+  return { ok, status: ok ? 200 : 400, json: async () => body }
+}
+
 describe('ContactSection', () => {
   beforeEach(() => {
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true }))
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(mockResponse(true)))
   })
 
   afterEach(() => {
@@ -38,7 +42,7 @@ describe('ContactSection', () => {
 
     expect(screen.getByRole('button', { name: /sending/i })).toBeDisabled()
 
-    resolveFetch({ ok: true })
+    resolveFetch(mockResponse(true))
     await screen.findByText(/message sent/i, {}, { timeout: 3000 })
   }, 10000)
 
@@ -66,7 +70,7 @@ describe('ContactSection', () => {
   }, 10000)
 
   it('shows an error and keeps the form filled when the request fails', async () => {
-    fetch.mockResolvedValue({ ok: false })
+    fetch.mockResolvedValue(mockResponse(false, { errors: [{ message: 'Invalid email' }] }))
     const user = userEvent.setup()
     render(<ContactSection />)
     await fillForm(user)

@@ -1,21 +1,35 @@
 import { useState } from 'react'
 import useScrollReveal from '../../hooks/useScrollReveal'
 
+const FORMSPREE_ENDPOINT = import.meta.env.VITE_FORMSPREE_ENDPOINT
+
 export default function ContactSection() {
   const [form, setForm] = useState({ name: '', email: '', message: '' })
   const [loading, setLoading] = useState(false)
   const [sent, setSent] = useState(false)
+  const [error, setError] = useState('')
   useScrollReveal()
 
   const handleChange = (e) => setForm((f) => ({ ...f, [e.target.name]: e.target.value }))
 
   const handleSubmit = async (e) => {
     e.preventDefault()
+    setError('')
     setLoading(true)
-    await new Promise((r) => setTimeout(r, 1500))
-    setLoading(false)
-    setSent(true)
-    setForm({ name: '', email: '', message: '' })
+    try {
+      const res = await fetch(FORMSPREE_ENDPOINT, {
+        method: 'POST',
+        headers: { Accept: 'application/json' },
+        body: new FormData(e.target),
+      })
+      if (!res.ok) throw new Error('Request failed')
+      setSent(true)
+      setForm({ name: '', email: '', message: '' })
+    } catch {
+      setError("Something went wrong — please email me directly at devanr2911@gmail.com")
+    } finally {
+      setLoading(false)
+    }
   }
 
   return (
@@ -122,6 +136,9 @@ export default function ContactSection() {
                     required
                   />
                 </div>
+                {error && (
+                  <p style={{ color: 'var(--accent, #c0392b)', fontSize: '.9rem' }}>{error}</p>
+                )}
                 <div className="contact__submit">
                   <button
                     type="submit"

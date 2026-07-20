@@ -1,4 +1,4 @@
-import { describe, it, expect, afterEach } from 'vitest'
+import { describe, it, expect, afterEach, beforeEach, vi } from 'vitest'
 import { render, screen, cleanup } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import ContactSection from './ContactSection'
@@ -10,8 +10,13 @@ async function fillForm(user) {
 }
 
 describe('ContactSection', () => {
+  beforeEach(() => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true }))
+  })
+
   afterEach(() => {
     cleanup()
+    vi.unstubAllGlobals()
   })
 
   it('shows the contact form by default', () => {
@@ -23,6 +28,8 @@ describe('ContactSection', () => {
   })
 
   it('disables the submit button and shows a sending state while the message is in flight', async () => {
+    let resolveFetch
+    fetch.mockReturnValue(new Promise((resolve) => { resolveFetch = resolve }))
     const user = userEvent.setup()
     render(<ContactSection />)
     await fillForm(user)
@@ -31,7 +38,7 @@ describe('ContactSection', () => {
 
     expect(screen.getByRole('button', { name: /sending/i })).toBeDisabled()
 
-    // Let the pending submit resolve so its timer doesn't leak into the next test.
+    resolveFetch({ ok: true })
     await screen.findByText(/message sent/i, {}, { timeout: 3000 })
   }, 10000)
 
@@ -56,5 +63,17 @@ describe('ContactSection', () => {
     await user.click(screen.getByRole('button', { name: /send another/i }))
 
     expect(screen.getByLabelText(/name/i)).toHaveValue('')
+  }, 10000)
+
+  it('shows an error and keeps the form filled when the request fails', async () => {
+    fetch.mockResolvedValue({ ok: false })
+    const user = userEvent.setup()
+    render(<ContactSection />)
+    await fillForm(user)
+
+    await user.click(screen.getByRole('button', { name: /send message/i }))
+
+    expect(await screen.findByText(/something went wrong/i)).toBeInTheDocument()
+    expect(screen.getByLabelText(/name/i)).toHaveValue('Jane Doe')
   }, 10000)
 })

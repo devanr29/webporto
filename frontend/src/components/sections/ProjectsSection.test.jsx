@@ -53,3 +53,51 @@ describe('ProjectsSection filter tabs', () => {
     expect(revealWrapper('MyIpond — Catfish Pond Water Quality')).toHaveClass('visible')
   })
 })
+
+describe('ProjectsSection links', () => {
+  beforeEach(() => {
+    globalThis.IntersectionObserver = AutoRevealObserver
+  })
+
+  afterEach(() => {
+    cleanup()
+  })
+
+  it('shows only the Spotify card under the Data filter', async () => {
+    const user = userEvent.setup()
+    render(<ProjectsSection />)
+
+    await user.click(screen.getByRole('button', { name: 'Data' }))
+
+    expect(screen.getByText('Most Streamed Songs on Spotify')).toBeInTheDocument()
+    expect(screen.queryByText('WhatsApp AI Personal Assistant')).not.toBeInTheDocument()
+    expect(screen.queryByText('GoatGuard — Innovillage 2023')).not.toBeInTheDocument()
+  })
+
+  it('links the GoatGuard card to its GitHub repo', () => {
+    render(<ProjectsSection />)
+
+    const links = screen.getAllByRole('link', { name: /GitHub — GoatGuard/i })
+    links.forEach((link) => {
+      expect(link).toHaveAttribute('href', 'https://github.com/devanr29/Kambing')
+    })
+  })
+
+  it('shows both a Live link and an Article link on the IMDb sentiment card', () => {
+    render(<ProjectsSection />)
+
+    expect(screen.getAllByRole('link', { name: /Live — Sentiment Analysis on IMDb Reviews/i }).length).toBeGreaterThan(0)
+    expect(screen.getAllByRole('link', { name: /Article — Sentiment Analysis on IMDb Reviews/i }).length).toBeGreaterThan(0)
+  })
+
+  it('shows the Claude skill card under both the AI and Apps & Tools filters', async () => {
+    const user = userEvent.setup()
+    render(<ProjectsSection />)
+
+    await user.click(screen.getByRole('button', { name: 'AI' }))
+    expect(screen.getByText('Codebase to Learn — Claude Skill for Vibe Coders')).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Apps & Tools' }))
+    expect(screen.getByText('Codebase to Learn — Claude Skill for Vibe Coders')).toBeInTheDocument()
+  })
+})

@@ -88,7 +88,7 @@ Keeping systems up,<br />
               </div>
 
               <div className="reveal reveal-delay-3">
-                <p className="about__skills-heading">Skills & Technologies</p>
+                <p className="about__skills-heading">Skills &amp; Technologies</p>
                 {Object.entries(SKILLS).map(([category, tags], idx) => (
                   <div key={category} className="about__skills-group">
                     <p className="about__skills-category">{category}</p>
